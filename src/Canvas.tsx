@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { Socket } from 'socket.io-client';
 
 type Point = { x: number; y: number };
@@ -9,9 +9,10 @@ type DrawingObject = {
   points: Point[]; 
   color: string; 
   width: number;
+  authorId?: string; // Track who made it for undo
 };
 
-export function Canvas({ currentTool = 'pen', currentColor = '#0f172a', onClearTriggered, socket }: { currentTool?: ToolType, currentColor?: string, onClearTriggered?: number, socket: Socket }) {
+export const Canvas = forwardRef(({ currentTool = 'pen', currentColor = '#0f172a', onClearTriggered, socket }: { currentTool?: ToolType, currentColor?: string, onClearTriggered?: number, socket: Socket }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
@@ -30,6 +31,31 @@ export function Canvas({ currentTool = 'pen', currentColor = '#0f172a', onClearT
   const [offset, setOffset] = useState<Point>({ x: 0, y: 0 });
   const [lastPanPoint, setLastPanPoint] = useState<Point | null>(null);
   const [lastDragPoint, setLastDragPoint] = useState<Point | null>(null);
+
+  // Expose methods to parent via ref
+  useImperativeHandle(ref, () => ({
+    undo: () => {
+      // Find the last object created by this user (or just the last object in general if simpler)
+      // For now, let's just undo the very last object in the list
+      setObjects(prev => {
+        if (prev.length === 0) return prev;
+        const lastObj = prev[prev.length - 1];
+        socket?.emit('delete-object', lastObj.id);
+        return prev.slice(0, -1);
+      });
+    },
+    exportImage: () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      
+      // We want to export the ACTUAL canvas content, not just the visible part
+      // But for simplicity, let's export the current visible view
+      const link = document.createElement('a');
+      link.download = `four-arms-export-${Date.now()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+  }));
 
   // Initialize offscreen canvas
   useEffect(() => {
@@ -64,8 +90,13 @@ export function Canvas({ currentTool = 'pen', currentColor = '#0f172a', onClearT
 
   useEffect(() => {
     if (onClearTriggered && onClearTriggered > 0) {
-      if (socket) socket.emit('clear-board');
-      else { setObjects([]); setSelectedObjectId(null); }
+      console.log('Clear triggered, emitting clear-board');
+      if (socket) {
+        socket.emit('clear-board');
+      } else {
+        setObjects([]);
+        setSelectedObjectId(null);
+      }
     }
   }, [onClearTriggered, socket]);
 
@@ -102,7 +133,7 @@ export function Canvas({ currentTool = 'pen', currentColor = '#0f172a', onClearT
   };
 
   const drawObject = (ctx: CanvasRenderingContext2D, obj: DrawingObject) => {
-    if (obj.points.length < 2) return;
+    if (obj.points.length < 1) return;
     
     ctx.save();
     ctx.beginPath();
@@ -141,7 +172,12 @@ export function Canvas({ currentTool = 'pen', currentColor = '#0f172a', onClearT
 
     if (['pen', 'eraser', 'pencil', 'marker', 'painter'].includes(obj.type)) {
       ctx.moveTo(start.x, start.y);
-      for (const p of rest) ctx.lineTo(p.x, p.y);
+      if (rest.length === 0) {
+        // Handle single point
+        ctx.lineTo(start.x, start.y);
+      } else {
+        for (const p of rest) ctx.lineTo(p.x, p.y);
+      }
     } else if (obj.type === 'rectangle') {
       ctx.rect(start.x, start.y, end.x - start.x, end.y - start.y);
     } else if (obj.type === 'circle') {
@@ -297,7 +333,7 @@ export function Canvas({ currentTool = 'pen', currentColor = '#0f172a', onClearT
       id: crypto.randomUUID(), 
       type: currentTool, 
       points: [pos], 
-      color: currentTool === 'eraser' ? 'transparent' : currentColor, 
+      color: currentTool === 'eraser' ? '#000000' : currentColor, 
       width: defaultWidth
     };
     
@@ -403,6 +439,16 @@ export function Canvas({ currentTool = 'pen', currentColor = '#0f172a', onClearT
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        // Undo
+        setObjects(prev => {
+          if (prev.length === 0) return prev;
+          const lastObj = prev[prev.length - 1];
+          socket?.emit('delete-object', lastObj.id);
+          return prev.slice(0, -1);
+        });
+      }
       if (e.key === 'Backspace' || e.key === 'Delete') {
         if (selectedObjectId) {
           setObjects(prev => prev.filter(obj => obj.id !== selectedObjectId));
@@ -457,4 +503,4 @@ export function Canvas({ currentTool = 'pen', currentColor = '#0f172a', onClearT
       )}
     </>
   );
-}
+});

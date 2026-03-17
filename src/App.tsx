@@ -31,24 +31,44 @@ function App() {
 
   // Phase 5: Messaging & Presence
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
   const [activeUsers, setActiveUsers] = useState<User[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  const canvasRef = React.useRef<{ exportImage: () => void, undo: () => void } | null>(null);
+
   // Initialize socket ONLY when authenticated
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const serverUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-      ? 'http://localhost:3001' 
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const isLocalIP = window.location.hostname.startsWith('192.168.') || window.location.hostname.startsWith('10.') || window.location.hostname.endsWith('.local');
+    
+    // If we're on a local network, use HTTP on port 3001
+    const serverUrl = (isLocalhost || isLocalIP)
+      ? `http://${window.location.hostname}:3001`
       : `https://${window.location.hostname}`;
       
-    const newSocket = io(serverUrl);
+    const newSocket = io(serverUrl, {
+      reconnectionAttempts: 10,
+      reconnectionDelay: 2000,
+    });
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
+      setIsConnected(true);
       newSocket.emit('join-room', { name: userName, room: roomPassword });
+    });
+
+    newSocket.on('disconnect', () => {
+      setIsConnected(false);
+    });
+
+    newSocket.on('connect_error', (err) => {
+      console.error('Connection error:', err);
+      setIsConnected(false);
     });
 
     newSocket.on('init-sync', (data: { objects: any[], users: User[], messages: ChatMessage[] }) => {
@@ -127,11 +147,29 @@ function App() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-dot-pattern bg-[length:24px_24px] bg-slate-50 transition-colors duration-500 animate-in fade-in duration-700">
+      {/* Connection Status Badge */}
+      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+        <div className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase flex items-center gap-1.5 backdrop-blur-md border ${
+          isConnected ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-rose-500/10 text-rose-500 border-rose-500/20 animate-pulse'
+        }`}>
+          <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`} />
+          {isConnected ? 'Live Sync Active' : 'Connecting to Server...'}
+        </div>
+      </div>
+
       {/* Active Users Overlay */}
       <ActiveUsers users={activeUsers} />
       
       {/* Canvas Layer */}
-      {socket && <Canvas currentTool={currentTool} currentColor={currentColor} onClearTriggered={clearTriggered} socket={socket} />}
+      {socket && (
+        <Canvas 
+          ref={canvasRef}
+          currentTool={currentTool} 
+          currentColor={currentColor} 
+          onClearTriggered={clearTriggered} 
+          socket={socket} 
+        />
+      )}
 
       {/* Top Header / Nav */}
       <div className="absolute top-0 left-0 w-full p-6 pointer-events-none z-20 flex justify-between items-start">
@@ -235,6 +273,14 @@ function App() {
               </div>
             </div>
 
+            <button 
+              onClick={() => canvasRef.current?.exportImage()}
+              className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-xl transition-all duration-200 active:scale-95 flex items-center gap-2"
+              title="Export as PNG"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export
+            </button>
             <div className="w-[1px] h-auto bg-slate-200 my-1 mx-1" />
             <button 
               onClick={handleClear}
@@ -263,6 +309,15 @@ function App() {
       {/* Floating Toolbar */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
         <div className="bg-white/80 backdrop-blur-2xl rounded-[1.5rem] shadow-2xl shadow-slate-200/50 border border-white/60 p-2.5 flex items-center justify-center gap-1.5 transition-all pointer-events-auto">
+          
+          <ToolButton 
+            active={false} 
+            onClick={() => canvasRef.current?.undo()} 
+            icon={<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>}
+            label="Undo (Ctrl+Z)"
+          />
+
+          <div className="w-[2px] h-8 bg-slate-100 rounded-full mx-1.5" />
           
           <ToolButton 
             active={currentTool === 'select'} 

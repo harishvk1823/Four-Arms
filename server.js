@@ -84,7 +84,11 @@ io.on('connection', (socket) => {
 
   // Clear the board for this room
   socket.on('clear-board', () => {
-    if (!currentRoom) return;
+    if (!currentRoom) {
+      console.warn(`Attempted clear-board from socket ${socket.id} with no currentRoom`);
+      return;
+    }
+    console.log(`Clearing board for room: ${currentRoom}`);
     const roomState = getRoom(currentRoom);
     roomState.objects = [];
     io.to(currentRoom).emit('board-cleared');
