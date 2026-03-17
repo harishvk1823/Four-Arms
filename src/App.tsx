@@ -85,11 +85,15 @@ function App() {
     });
 
     newSocket.on('new-message', (msg: ChatMessage) => {
+      console.log(`[Chat] Received new-message:`, msg);
       setMessages(prev => [...prev, msg]);
       
       // Increment unread if chat is closed
       setIsChatOpen(current => {
-        if (!current) setUnreadCount(u => u + 1);
+        if (!current) {
+          console.log(`[Chat] Chat closed, incrementing unreadCount`);
+          setUnreadCount(u => u + 1);
+        }
         return current;
       });
     });
@@ -128,7 +132,11 @@ function App() {
   };
 
   const handleSendMessage = (text: string) => {
-    if (!socket) return;
+    if (!socket || !isConnected) {
+      console.warn(`[Chat] Cannot send message: socket connected=${!!socket}, isConnected=${isConnected}`);
+      return;
+    }
+    console.log(`[Chat] Sending message: ${text}`);
     const msg: ChatMessage = {
       id: crypto.randomUUID(),
       senderName: userName,
@@ -136,9 +144,6 @@ function App() {
       timestamp: Date.now()
     };
     socket.emit('send-message', msg);
-    // Optimistic UI update (optional, server broadcasts it to us too, but we can rely on broadcast only or optimistic)
-    // Actually the server broadcasts to all including sender? Our server.js `io.emit` sends to all.
-    // So we don't need optimistic update here to avoid duplicates.
   };
 
   useEffect(() => {

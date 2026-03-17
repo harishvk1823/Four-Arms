@@ -105,7 +105,11 @@ io.on('connection', (socket) => {
 
   // Chat message
   socket.on('send-message', (msg) => {
-    if (!currentRoom) return;
+    if (!currentRoom) {
+      console.warn(`[Chat] Attempted to send message from socket ${socket.id} with no currentRoom`);
+      return;
+    }
+    console.log(`[Chat] Message in room "${currentRoom}" from "${msg.senderName}": ${msg.text}`);
     const roomState = getRoom(currentRoom);
     roomState.messages.push(msg);
     if (roomState.messages.length > 100) roomState.messages.shift();

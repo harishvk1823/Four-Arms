@@ -25,6 +25,7 @@ export function ChatPanel({ messages, onSendMessage, isOpen, onClose }: ChatPane
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log(`[ChatPanel] Form submitted with text: ${inputText}`);
     if (inputText.trim()) {
       onSendMessage(inputText.trim());
       setInputText('');
@@ -48,20 +49,30 @@ export function ChatPanel({ messages, onSendMessage, isOpen, onClose }: ChatPane
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.map((msg, idx) => {
-            const isConsecutive = idx > 0 && messages[idx - 1].senderName === msg.senderName;
-            
-            return (
-              <div key={msg.id} className={`flex flex-col ${isConsecutive ? 'mt-1' : 'mt-4'}`}>
-                {!isConsecutive && (
-                  <span className="text-xs font-semibold text-slate-500 mb-1 ml-1">{msg.senderName}</span>
-                )}
-                <div className="bg-slate-100/80 rounded-2xl rounded-tl-sm px-4 py-2 text-sm text-slate-700 w-fit max-w-[90%]">
-                  {msg.text}
-                </div>
+          {messages.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3 opacity-40">
+              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
               </div>
-            );
-          })}
+              <p className="text-sm font-medium text-slate-500">No messages yet.<br/>Start the conversation!</p>
+            </div>
+          ) : (
+            messages.map((msg, idx) => {
+              const senderName = msg.senderName || 'Anonymous';
+              const isConsecutive = idx > 0 && messages[idx - 1].senderName === senderName;
+              
+              return (
+                <div key={msg.id || idx} className={`flex flex-col ${isConsecutive ? 'mt-1' : 'mt-4'}`}>
+                  {!isConsecutive && (
+                    <span className="text-xs font-semibold text-slate-500 mb-1 ml-1">{senderName}</span>
+                  )}
+                  <div className="bg-slate-100/80 rounded-2xl rounded-tl-sm px-4 py-2 text-sm text-slate-700 w-fit max-w-[90%] shadow-sm border border-slate-200/30">
+                    {msg.text}
+                  </div>
+                </div>
+              );
+            })
+          )}
           <div ref={messagesEndRef} />
         </div>
 
