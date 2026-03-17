@@ -3,13 +3,14 @@ import { User } from './ActiveUsers';
 
 type MembersPanelProps = {
   users: User[];
+  roomId: string; // Add roomId prop
   isOpen: boolean;
   onClose: () => void;
   onInvite: () => void;
   currentUserId?: string;
 };
 
-export function MembersPanel({ users, isOpen, onClose, onInvite, currentUserId }: MembersPanelProps) {
+export function MembersPanel({ users, roomId, isOpen, onClose, onInvite, currentUserId }: MembersPanelProps) {
   const [showCopied, setShowCopied] = React.useState(false);
 
   const handleInviteClick = () => {
@@ -48,6 +49,20 @@ export function MembersPanel({ users, isOpen, onClose, onInvite, currentUserId }
         </button>
       </div>
 
+      {/* Room Details Section */}
+      <div className="p-3 bg-indigo-50/40 border-b border-indigo-100/50">
+         <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-0.5">
+               <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest">Active Room</span>
+               <span className="text-xs font-mono font-bold text-indigo-600">{roomId}</span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-emerald-50 px-2 py-1 rounded-full border border-emerald-100">
+               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+               <span className="text-[9px] font-extrabold text-emerald-600 uppercase">Live</span>
+            </div>
+         </div>
+      </div>
+
       <div className="flex-1 overflow-y-auto p-3">
         <div className="space-y-1">
           {users.map((user) => (
@@ -70,12 +85,6 @@ export function MembersPanel({ users, isOpen, onClose, onInvite, currentUserId }
                   </div>
                 </div>
               </div>
-              
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="w-6 h-6 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500 cursor-pointer">
-                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                </div>
-              </div>
             </div>
           ))}
         </div>
@@ -84,17 +93,17 @@ export function MembersPanel({ users, isOpen, onClose, onInvite, currentUserId }
       <div className="p-3 border-t border-slate-200/60 bg-slate-50/50">
          <button 
            onClick={handleInviteClick}
-           className={`w-full py-2 text-white text-xs font-bold rounded-lg shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 ${showCopied ? 'bg-emerald-500 shadow-emerald-100' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'}`}
+           className={`w-full py-2.5 text-white text-xs font-bold rounded-lg shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 ${showCopied ? 'bg-emerald-500 shadow-emerald-100' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'}`}
          >
            {showCopied ? (
              <>
                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-               Copied!
+               Copied Link!
              </>
            ) : (
              <>
-               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>
-               Invite Member
+               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+               Copy Invite Link
              </>
            )}
          </button>

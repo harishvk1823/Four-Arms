@@ -476,6 +476,7 @@ function App() {
 
       <MembersPanel
         users={activeUsers}
+        roomId={roomPassword}
         isOpen={isMembersOpen}
         onClose={() => setIsMembersOpen(false)}
         onInvite={handleShare}
