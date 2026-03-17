@@ -1,0 +1,54 @@
+# FOUR ARMS Project Blueprint
+
+## 1. Project Overview
+**FOUR ARMS** is a real-time collaborative whiteboard web application designed to allow multiple users to draw, brainstorm, and interact simultaneously on a shared infinite canvas. The name "FOUR ARMS" implies multi-user parallel interaction capability. It provides essential drawing tools, sticky notes, and smooth panning/zooming controls to enable a fluid design and diagramming experience.
+
+## 2. Architecture & Technology Stack
+- **Frontend Stack**: Vite + React (TypeScript) for high performance and strong typing.
+- **Styling**: Tailwind CSS for rapid UI development and a custom CSS structure for the canvas overlay.
+- **Canvas Engine**: HTML5 `<canvas>` API with a custom rendering loop (using `requestAnimationFrame`).
+- **Backend Stack**: Node.js + Express.js for the API and static file serving.
+- **Real-Time Communication**: Socket.io or Liveblocks for WebSocket-based cursor broadcasting and drawing synchronization.
+- **Deployment**: Configured for rapid deployment (e.g., Vercel for frontend, Render/Heroku for backend/WebSocket server).
+
+## 3. Core Features & Requirements
+
+### 3.1. Minimum Viable Product (MVP)
+- **Infinite Canvas**: A canvas that users can pan and zoom indefinitely with a grid background.
+- **Basic Drawing Tools**: Pen tool (freehand), basic shapes (Rectangle, Circle), and Eraser.
+- **Real-Time Collaboration**: Users can see each other's live cursor positions and drawing actions instantly.
+- **Toolbars & UI**: A floating bottom toolbar for tool selection and a top-right menu for global actions (Clear Canvas, Export).
+
+### 3.2. Future Enhancements
+- **Sticky Notes**: Pre-styled interactive sticky notes supporting text input.
+- **Object Selection & Manipulation**: Select, move, resize, and delete individual drawn strokes or shapes.
+- **Room Management & Auth**: Create private rooms with shareable links and basic user authentication.
+- **Undo/Redo Stack**: Robust history management for correcting mistakes.
+- **Export Capabilities**: Save the whiteboard as a PNG or SVG file.
+
+## 4. Work Breakdown Structure (Phases)
+
+- **Phase 1: Setup and Foundation** (Current)
+  - Initialize Vite + React client and Node.js + Express backend.
+  - Set up Tailwind CSS.
+  - Build the base UI components (Toolbar, Canvas container, Menus).
+
+- **Phase 2: Core Drawing & Interaction**
+  - Implement HTML5 Canvas context and rendering loop.
+  - Add pan/zoom controls (mouse wheel and trackpad).
+  - Implement the Pen, Eraser, and Shape tools.
+
+- **Phase 3: Real-Time Sync & Collaboration**
+  - Set up the Express/Socket.io backend server.
+  - Handle room joining logic.
+  - Broadcast and render remote cursor movements and drawing events in real-time.
+
+- **Phase 4: Advanced Features & Polish**
+  - Implement sticky notes and text editing.
+  - Add object selection and moving.
+  - Optimize rendering performance and finalize UI polish.
+
+## 5. Development Guidelines
+- Ensure all canvas rendering coordinates match the device pixel ratio to avoid blurriness.
+- Keep the real-time event payloads small (e.g., streaming drawing deltas rather than the entire canvas image).
+- Use modular React components for UI elements over the canvas.
