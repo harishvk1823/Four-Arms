@@ -48,7 +48,7 @@ function App() {
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
-      newSocket.emit('join-room', { name: userName });
+      newSocket.emit('join-room', { name: userName, room: roomPassword });
     });
 
     newSocket.on('init-sync', (data: { objects: any[], users: User[], messages: ChatMessage[] }) => {

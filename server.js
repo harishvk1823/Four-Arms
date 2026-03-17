@@ -9,71 +9,112 @@ app.use(cors());
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: '*', // for development we allow all
+    origin: '*',
     methods: ['GET', 'POST']
   }
 });
 
-// Store current whiteboard state in memory
-let whiteboardObjects = [];
-let activeUsers = {};
-let messages = [];
+// Per-room state: keyed by room password
+// { [roomId]: { objects: [], users: {}, messages: [] } }
+const rooms = {};
+
+function getRoom(roomId) {
+  if (!rooms[roomId]) {
+    rooms[roomId] = { objects: [], users: {}, messages: [] };
+  }
+  return rooms[roomId];
+}
 
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
 
-  // Send the current state of the whiteboard and messages to the newly connected user
-  socket.emit('init-sync', {
-    objects: whiteboardObjects,
-    users: Object.values(activeUsers),
-    messages: messages
+  // Track which room this socket belongs to
+  let currentRoom = null;
+
+  socket.on('join-room', ({ name, room }) => {
+    // Default room if no password provided
+    const roomId = room || '__default__';
+    currentRoom = roomId;
+
+    // Join Socket.IO room for targeted broadcasting
+    socket.join(roomId);
+
+    // Register user in this room
+    const roomState = getRoom(roomId);
+    roomState.users[socket.id] = { id: socket.id, name };
+
+    // Send the current whiteboard state to the newly joined user
+    socket.emit('init-sync', {
+      objects: roomState.objects,
+      users: Object.values(roomState.users),
+      messages: roomState.messages
+    });
+
+    // Notify all users in the room of the updated user list
+    io.to(roomId).emit('users-updated', Object.values(roomState.users));
+    console.log(`User "${name}" joined room "${roomId}"`);
   });
 
-  socket.on('join-room', (user) => {
-    activeUsers[socket.id] = { id: socket.id, ...user };
-    io.emit('users-updated', Object.values(activeUsers));
-  });
-
-  // Listen for a new drawing object
+  // New drawing object
   socket.on('draw-object', (obj) => {
-    whiteboardObjects.push(obj);
-    // Broadcast the new object to all OTHER clients
-    socket.broadcast.emit('new-object', obj);
+    if (!currentRoom) return;
+    const roomState = getRoom(currentRoom);
+    roomState.objects.push(obj);
+    socket.to(currentRoom).emit('new-object', obj);
   });
 
-  // Listen for object updates (e.g. while moving/dragging)
+  // Object moved/updated
   socket.on('update-object', (updatedObj) => {
-    const idx = whiteboardObjects.findIndex(o => o.id === updatedObj.id);
+    if (!currentRoom) return;
+    const roomState = getRoom(currentRoom);
+    const idx = roomState.objects.findIndex(o => o.id === updatedObj.id);
     if (idx !== -1) {
-      whiteboardObjects[idx] = updatedObj;
-      socket.broadcast.emit('object-updated', updatedObj);
+      roomState.objects[idx] = updatedObj;
+      socket.to(currentRoom).emit('object-updated', updatedObj);
     }
   });
 
-  // Listen for deleted objects
+  // Object deleted
   socket.on('delete-object', (objId) => {
-    whiteboardObjects = whiteboardObjects.filter(o => o.id !== objId);
-    socket.broadcast.emit('object-deleted', objId);
+    if (!currentRoom) return;
+    const roomState = getRoom(currentRoom);
+    roomState.objects = roomState.objects.filter(o => o.id !== objId);
+    socket.to(currentRoom).emit('object-deleted', objId);
   });
 
-  // Listen for clear board command
+  // Clear the board for this room
   socket.on('clear-board', () => {
-    whiteboardObjects = [];
-    io.emit('board-cleared'); // emit to ALL clients, including sender
+    if (!currentRoom) return;
+    const roomState = getRoom(currentRoom);
+    roomState.objects = [];
+    io.to(currentRoom).emit('board-cleared');
   });
 
   // Chat message
   socket.on('send-message', (msg) => {
-    messages.push(msg);
-    // Keep only last 100 messages in memory to avoid leaking
-    if (messages.length > 100) messages.shift();
-    io.emit('new-message', msg);
+    if (!currentRoom) return;
+    const roomState = getRoom(currentRoom);
+    roomState.messages.push(msg);
+    if (roomState.messages.length > 100) roomState.messages.shift();
+    io.to(currentRoom).emit('new-message', msg);
   });
 
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`);
-    delete activeUsers[socket.id];
-    io.emit('users-updated', Object.values(activeUsers));
+    if (!currentRoom) return;
+    const roomState = getRoom(currentRoom);
+    delete roomState.users[socket.id];
+    io.to(currentRoom).emit('users-updated', Object.values(roomState.users));
+
+    // Clean up empty rooms to avoid memory leaks
+    if (
+      Object.keys(roomState.users).length === 0 &&
+      roomState.objects.length === 0 &&
+      roomState.messages.length === 0
+    ) {
+      delete rooms[currentRoom];
+      console.log(`Room "${currentRoom}" cleaned up (empty).`);
+    }
   });
 });
 
