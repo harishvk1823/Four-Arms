@@ -1,13 +1,22 @@
+import React from 'react';
 import { User } from './ActiveUsers';
 
 type MembersPanelProps = {
   users: User[];
   isOpen: boolean;
   onClose: () => void;
+  onInvite: () => void;
   currentUserId?: string;
 };
 
-export function MembersPanel({ users, isOpen, onClose, currentUserId }: MembersPanelProps) {
+export function MembersPanel({ users, isOpen, onClose, onInvite, currentUserId }: MembersPanelProps) {
+  const [showCopied, setShowCopied] = React.useState(false);
+
+  const handleInviteClick = () => {
+    onInvite();
+    setShowCopied(true);
+    setTimeout(() => setShowCopied(false), 2000);
+  };
   // Colors for avatars based on name hash (using same logic as ActiveUsers)
   const getAvatarColor = (name: string) => {
     const colors = ['bg-rose-500', 'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-fuchsia-500', 'bg-cyan-500', 'bg-violet-500'];
@@ -74,14 +83,20 @@ export function MembersPanel({ users, isOpen, onClose, currentUserId }: MembersP
 
       <div className="p-3 border-t border-slate-200/60 bg-slate-50/50">
          <button 
-           onClick={() => {
-              const url = new URL(window.location.href);
-              navigator.clipboard.writeText(url.toString());
-           }}
-           className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-md shadow-indigo-100 flex items-center justify-center gap-2 transition-all active:scale-95"
+           onClick={handleInviteClick}
+           className={`w-full py-2 text-white text-xs font-bold rounded-lg shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 ${showCopied ? 'bg-emerald-500 shadow-emerald-100' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'}`}
          >
-           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>
-           Invite Member
+           {showCopied ? (
+             <>
+               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+               Copied!
+             </>
+           ) : (
+             <>
+               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>
+               Invite Member
+             </>
+           )}
          </button>
       </div>
     </div>

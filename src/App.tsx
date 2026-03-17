@@ -471,6 +471,7 @@ function App() {
         users={activeUsers}
         isOpen={isMembersOpen}
         onClose={() => setIsMembersOpen(false)}
+        onInvite={handleShare}
         currentUserId={socket?.id}
       />
 
