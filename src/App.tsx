@@ -6,7 +6,18 @@ import { ActiveUsers, User } from './components/ActiveUsers';
 import { ChatPanel, ChatMessage } from './components/ChatPanel';
 import { MembersPanel } from './components/MembersPanel';
 
-type ToolType = 'select' | 'pen' | 'pencil' | 'marker' | 'painter' | 'rectangle' | 'circle' | 'eraser';
+type ToolType = 'select' | 'pen' | 'pencil' | 'marker' | 'painter' | 'rectangle' | 'circle' | 'eraser' | 'text';
+
+type Point = { x: number; y: number };
+type DrawingObject = { 
+  id: string;
+  type: ToolType;
+  points: Point[]; 
+  color: string; 
+  width: number;
+  authorId?: string;
+  text?: string;
+};
 
 const COLORS = [
   { id: 'slate', value: '#0f172a' },
@@ -39,6 +50,7 @@ function App() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isMembersOpen, setIsMembersOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [objects, setObjects] = useState<DrawingObject[]>([]);
 
   const canvasRef = React.useRef<{ exportImage: () => void, undo: () => void, redo: () => void } | null>(null);
 
@@ -77,10 +89,11 @@ function App() {
       setIsConnected(false);
     });
 
-    newSocket.on('init-sync', (data: { objects: any[], users: User[], messages: ChatMessage[] }) => {
+    newSocket.on('init-sync', (data: { objects: DrawingObject[], users: User[], messages: ChatMessage[] }) => {
       console.log(`[Chat] Init-sync received. Messages count:`, data.messages?.length || 0);
       setActiveUsers(data.users || []);
       setMessages(data.messages || []);
+      setObjects(data.objects || []);
     });
 
     newSocket.on('users-updated', (users: User[]) => {
@@ -343,6 +356,8 @@ function App() {
           strokeWidth={strokeWidth}
           onClearTriggered={clearTriggered} 
           socket={socket} 
+          objects={objects}
+          setObjects={setObjects}
         />
       )}
 
@@ -401,6 +416,13 @@ function App() {
             onClick={() => setCurrentTool('painter')} 
             icon={<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3v15"/><path d="M4 14l5-2 5 2v-4l-5-2-5 2z"/><path d="M15 15v3c0 2.2 1.8 4 4 4 1.1 0 2-.9 2-2s-.9-2-2-2c-1.1 0-2-.9-2-2"/></svg>}
             label="Painter Brush"
+          />
+
+          <ToolButton 
+            active={currentTool === 'text'} 
+            onClick={() => setCurrentTool('text')} 
+            icon={<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3H7c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/><path d="M9 9h6"/><path d="M12 9v6"/></svg>}
+            label="Text Tool (T)"
           />
 
           <div className="w-[2px] h-8 bg-slate-100 rounded-full mx-1.5" />

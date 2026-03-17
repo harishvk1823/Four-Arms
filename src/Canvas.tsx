@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback, useImperativeHandle, f
 import { Socket } from 'socket.io-client';
 
 type Point = { x: number; y: number };
-type ToolType = 'select' | 'pen' | 'pencil' | 'marker' | 'painter' | 'rectangle' | 'circle' | 'eraser';
+type ToolType = 'select' | 'pen' | 'pencil' | 'marker' | 'painter' | 'rectangle' | 'circle' | 'eraser' | 'text';
 type DrawingObject = { 
   id: string;
   type: ToolType;
@@ -10,6 +10,7 @@ type DrawingObject = {
   color: string; 
   width: number;
   authorId?: string; // Track who made it for undo
+  text?: string; // For text tool
 };
 
 type RemoteCursor = {
@@ -20,7 +21,25 @@ type RemoteCursor = {
   lastUpdate: number;
 };
 
-export const Canvas = forwardRef(({ userName, currentTool = 'pen', currentColor = '#0f172a', strokeWidth = 3, onClearTriggered, socket }: { userName: string, currentTool?: ToolType, currentColor?: string, strokeWidth?: number, onClearTriggered?: number, socket: Socket }, ref) => {
+export const Canvas = forwardRef(({ 
+  userName, 
+  currentTool = 'pen', 
+  currentColor = '#0f172a', 
+  strokeWidth = 3, 
+  onClearTriggered, 
+  socket,
+  objects,
+  setObjects
+}: { 
+  userName: string, 
+  currentTool?: ToolType, 
+  currentColor?: string, 
+  strokeWidth?: number, 
+  onClearTriggered?: number, 
+  socket: Socket,
+  objects: DrawingObject[],
+  setObjects: React.Dispatch<React.SetStateAction<DrawingObject[]>>
+}, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
@@ -30,7 +49,6 @@ export const Canvas = forwardRef(({ userName, currentTool = 'pen', currentColor 
   const [isPanning, setIsPanning] = useState(false);
   const [isDraggingObj, setIsDraggingObj] = useState(false);
   
-  const [objects, setObjects] = useState<DrawingObject[]>([]);
   const [, setRedoStack] = useState<DrawingObject[]>([]);
   const [currentObject, setCurrentObject] = useState<DrawingObject | null>(null);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
@@ -82,7 +100,6 @@ export const Canvas = forwardRef(({ userName, currentTool = 'pen', currentColor 
   // Use the Socket.io connection passed from App
   useEffect(() => {
     if (!socket) return;
-    socket.on('init-sync', (data: { objects: DrawingObject[] }) => setObjects(data.objects || []));
     socket.on('new-object', (obj: DrawingObject) => setObjects(prev => [...prev, obj]));
     socket.on('object-updated', (updatedObj: DrawingObject) => setObjects(prev => prev.map(o => o.id === updatedObj.id ? updatedObj : o)));
     socket.on('object-deleted', (objId: string) => {
@@ -114,7 +131,6 @@ export const Canvas = forwardRef(({ userName, currentTool = 'pen', currentColor 
     });
 
     return () => {
-      socket.off('init-sync');
       socket.off('new-object');
       socket.off('object-updated');
       socket.off('object-deleted');
@@ -122,7 +138,7 @@ export const Canvas = forwardRef(({ userName, currentTool = 'pen', currentColor 
       socket.off('cursor-updated');
       socket.off('users-updated');
     };
-  }, [socket]);
+  }, [socket, setObjects]);
 
   // Clean up stale cursors (30s)
   useEffect(() => {
@@ -219,6 +235,12 @@ export const Canvas = forwardRef(({ userName, currentTool = 'pen', currentColor 
     } else if (obj.type === 'circle') {
       const radius = Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2));
       ctx.arc(start.x, start.y, radius, 0, 2 * Math.PI);
+    } else if (obj.type === 'text' && obj.text) {
+      ctx.font = `bold ${obj.width * 5}px Inter, system-ui, sans-serif`;
+      ctx.fillStyle = obj.color;
+      ctx.fillText(obj.text, start.x, start.y);
+      ctx.restore();
+      return;
     }
     ctx.stroke();
     ctx.restore();
@@ -330,6 +352,22 @@ export const Canvas = forwardRef(({ userName, currentTool = 'pen', currentColor 
         setLastDragPoint(pos);
       } else {
         setSelectedObjectId(null);
+      }
+      return;
+    }
+    if (currentTool === 'text') {
+      const text = window.prompt('Enter text:');
+      if (text) {
+        const newObj: DrawingObject = {
+          id: crypto.randomUUID(),
+          type: 'text',
+          points: [pos],
+          color: currentColor,
+          width: strokeWidth,
+          text: text
+        };
+        setObjects(prev => [...prev, newObj]);
+        socket?.emit('draw-object', newObj);
       }
       return;
     }
