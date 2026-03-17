@@ -26,6 +26,7 @@ function App() {
   
   const [currentTool, setCurrentTool] = useState<ToolType>('pen');
   const [currentColor, setCurrentColor] = useState<string>(COLORS[0].value);
+  const [strokeWidth, setStrokeWidth] = useState(3);
   const [clearTriggered, setClearTriggered] = useState(0);
   const [isMeetMenuOpen, setIsMeetMenuOpen] = useState(false);
 
@@ -44,7 +45,10 @@ function App() {
     if (!isAuthenticated) return;
 
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const isLocalIP = window.location.hostname.startsWith('192.168.') || window.location.hostname.startsWith('10.') || window.location.hostname.endsWith('.local');
+    const isLocalIP = window.location.hostname.startsWith('192.168.') || 
+                      window.location.hostname.startsWith('10.') || 
+                      window.location.hostname.startsWith('172.') ||
+                      window.location.hostname.endsWith('.local');
     
     // If we're on a local network, use HTTP on port 3001
     const serverUrl = (isLocalhost || isLocalIP)
@@ -93,7 +97,7 @@ function App() {
     return () => {
       newSocket.disconnect();
     };
-  }, [isAuthenticated, userName]);
+  }, [isAuthenticated, userName, roomPassword]);
 
 
   const handleClear = () => {
@@ -147,47 +151,42 @@ function App() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-dot-pattern bg-[length:24px_24px] bg-slate-50 transition-colors duration-500 animate-in fade-in duration-700">
-      {/* Connection Status Badge */}
-      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
-        <div className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase flex items-center gap-1.5 backdrop-blur-md border ${
-          isConnected ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-rose-500/10 text-rose-500 border-rose-500/20 animate-pulse'
-        }`}>
-          <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`} />
-          {isConnected ? 'Live Sync Active' : 'Connecting to Server...'}
-        </div>
-      </div>
-
-      {/* Active Users Overlay */}
-      <ActiveUsers users={activeUsers} />
-      
-      {/* Canvas Layer */}
-      {socket && (
-        <Canvas 
-          ref={canvasRef}
-          currentTool={currentTool} 
-          currentColor={currentColor} 
-          onClearTriggered={clearTriggered} 
-          socket={socket} 
-        />
-      )}
-
-      {/* Top Header / Nav */}
-      <div className="absolute top-0 left-0 w-full p-6 pointer-events-none z-20 flex justify-between items-start">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-500 to-fuchsia-500 shadow-xl shadow-blue-500/20 flex items-center justify-center text-white pointer-events-auto cursor-pointer hover:scale-105 transition-transform duration-300 ring-1 ring-white/20">
-            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M24 10 V24 H38" />
-              <path d="M38 24 V38 H24" />
-              <path d="M24 38 V24 H10" />
-              <path d="M10 24 V10 H24" />
-              <circle cx="24" cy="24" r="4" fill="currentColor" />
-            </svg>
+      <header className="fixed top-0 left-0 w-full h-16 flex items-center justify-between px-6 bg-white/70 backdrop-blur-xl border-b border-slate-200/50 z-30 select-none">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
+              <span className="text-white font-black text-xl italic tracking-tighter">4A</span>
+            </div>
+            <div className="flex flex-col">
+              <h1 className="text-sm font-bold text-slate-900 tracking-tight leading-none uppercase">Four Arms</h1>
+              <span className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mt-1">Collab Canvas</span>
+            </div>
           </div>
-          <div className="bg-white/70 backdrop-blur-xl border border-white/40 shadow-sm px-4 py-2 rounded-xl pointer-events-auto">
-            <h1 className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-500 tracking-tight">
-              FOUR ARMS
-            </h1>
-            <p className="text-xs font-medium text-slate-400">Collaborative Whiteboard</p>
+
+          <div className="h-8 w-[1px] bg-slate-200 hidden md:block" />
+
+          {/* Room Info */}
+          <div className="hidden lg:flex flex-col">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Room ID</span>
+              <div className="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-mono font-bold text-slate-600 border border-slate-200">
+                {roomPassword}
+              </div>
+            </div>
+            <div className="flex items-center gap-5 mt-1">
+              <div className="flex items-center gap-1.5">
+                <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+                <span className={`text-[10px] font-bold uppercase tracking-tight ${isConnected ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {isConnected ? 'Live Sync Active' : 'Connecting to Server...'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-slate-400">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-tight">{activeUsers.length} Online</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -297,14 +296,30 @@ function App() {
             className="w-14 h-14 bg-white/80 backdrop-blur-xl rounded-2xl shadow-lg border border-white/50 flex items-center justify-center text-slate-700 hover:shadow-xl hover:bg-white/90 transition-all active:scale-95 relative"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm border-2 border-white">
-                {unreadCount > 9 ? '9+' : unreadCount}
+            {unreadCount > 0 && !isChatOpen && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white animate-bounce shadow-sm">
+                {unreadCount}
               </span>
             )}
           </button>
         </div>
-      </div>
+      </header>
+
+      {/* Active Users Overlay */}
+      <ActiveUsers users={activeUsers} />
+      
+      {/* Canvas Layer */}
+      {socket && (
+        <Canvas 
+          ref={canvasRef}
+          userName={userName}
+          currentTool={currentTool} 
+          currentColor={currentColor} 
+          strokeWidth={strokeWidth}
+          onClearTriggered={clearTriggered} 
+          socket={socket} 
+        />
+      )}
 
       {/* Floating Toolbar */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
@@ -378,6 +393,19 @@ function App() {
             icon={<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"></path><path d="M22 21H7"></path><path d="m5 11 9 9"></path></svg>}
             label="Eraser (E)"
           />
+
+          {/* Brush Size Slider */}
+          <div className="flex flex-col items-center px-4 gap-1 group/slider">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter opacity-0 group-hover/slider:opacity-100 transition-opacity">Size</span>
+            <input 
+              type="range" 
+              min="1" 
+              max="20" 
+              value={strokeWidth} 
+              onChange={(e) => setStrokeWidth(parseInt(e.target.value))}
+              className="w-24 h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+            />
+          </div>
 
           <div className="w-[2px] h-8 bg-slate-100 rounded-full mx-1.5" />
 

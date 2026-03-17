@@ -63,6 +63,15 @@ io.on('connection', (socket) => {
     socket.to(currentRoom).emit('new-object', obj);
   });
 
+  // Cursor movement
+  socket.on('cursor-move', (data) => {
+    if (!currentRoom) return;
+    socket.to(currentRoom).emit('cursor-updated', {
+      id: socket.id,
+      ...data
+    });
+  });
+
   // Object moved/updated
   socket.on('update-object', (updatedObj) => {
     if (!currentRoom) return;
