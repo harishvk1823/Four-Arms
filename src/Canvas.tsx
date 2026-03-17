@@ -31,6 +31,7 @@ export const Canvas = forwardRef(({ userName, currentTool = 'pen', currentColor 
   const [isDraggingObj, setIsDraggingObj] = useState(false);
   
   const [objects, setObjects] = useState<DrawingObject[]>([]);
+  const [, setRedoStack] = useState<DrawingObject[]>([]);
   const [currentObject, setCurrentObject] = useState<DrawingObject | null>(null);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [remoteCursors, setRemoteCursors] = useState<Record<string, RemoteCursor>>({});
@@ -47,7 +48,17 @@ export const Canvas = forwardRef(({ userName, currentTool = 'pen', currentColor 
       setObjects(prev => {
         if (prev.length === 0) return prev;
         const lastObj = prev[prev.length - 1];
+        setRedoStack(redo => [...redo, lastObj]);
         socket?.emit('delete-object', lastObj.id);
+        return prev.slice(0, -1);
+      });
+    },
+    redo: () => {
+      setRedoStack(prev => {
+        if (prev.length === 0) return prev;
+        const nextObj = prev[prev.length - 1];
+        setObjects(objs => [...objs, nextObj]);
+        socket?.emit('draw-object', nextObj);
         return prev.slice(0, -1);
       });
     },
@@ -323,6 +334,7 @@ export const Canvas = forwardRef(({ userName, currentTool = 'pen', currentColor 
       return;
     }
     setSelectedObjectId(null);
+    setRedoStack([]); // Clear redo stack on new action
     setIsDrawing(true);
     const newObj: DrawingObject = { 
       id: crypto.randomUUID(), 
@@ -403,10 +415,34 @@ export const Canvas = forwardRef(({ userName, currentTool = 'pen', currentColor 
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
         e.preventDefault();
-        setObjects(prev => {
+        if (e.shiftKey) {
+          // Redo (Ctrl+Shift+Z)
+          setRedoStack(prev => {
+            if (prev.length === 0) return prev;
+            const nextObj = prev[prev.length - 1];
+            setObjects(objs => [...objs, nextObj]);
+            socket?.emit('draw-object', nextObj);
+            return prev.slice(0, -1);
+          });
+        } else {
+          // Undo (Ctrl+Z)
+          setObjects(prev => {
+            if (prev.length === 0) return prev;
+            const lastObj = prev[prev.length - 1];
+            setRedoStack(redo => [...redo, lastObj]);
+            socket?.emit('delete-object', lastObj.id);
+            return prev.slice(0, -1);
+          });
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        e.preventDefault();
+        // Redo (Ctrl+Y)
+        setRedoStack(prev => {
           if (prev.length === 0) return prev;
-          const lastObj = prev[prev.length - 1];
-          socket?.emit('delete-object', lastObj.id);
+          const nextObj = prev[prev.length - 1];
+          setObjects(objs => [...objs, nextObj]);
+          socket?.emit('draw-object', nextObj);
           return prev.slice(0, -1);
         });
       }
