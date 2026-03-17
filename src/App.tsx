@@ -4,6 +4,7 @@ import { Canvas } from './Canvas';
 import { LoginScreen } from './LoginScreen';
 import { ActiveUsers, User } from './components/ActiveUsers';
 import { ChatPanel, ChatMessage } from './components/ChatPanel';
+import { MembersPanel } from './components/MembersPanel';
 
 type ToolType = 'select' | 'pen' | 'pencil' | 'marker' | 'painter' | 'rectangle' | 'circle' | 'eraser';
 
@@ -36,6 +37,7 @@ function App() {
   const [activeUsers, setActiveUsers] = useState<User[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isMembersOpen, setIsMembersOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
   const canvasRef = React.useRef<{ exportImage: () => void, undo: () => void } | null>(null);
@@ -188,15 +190,24 @@ function App() {
               <div className="flex items-center gap-1.5">
                 <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
                 <span className={`text-[10px] font-bold uppercase tracking-tight ${isConnected ? 'text-emerald-600' : 'text-rose-600'}`}>
-                  {isConnected ? 'Live Sync Active' : 'Connecting to Server...'}
+                  {isConnected ? 'Live Sync Active' : 'Connecting' /* Shortened for space */}
                 </span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-slate-400">
+              <button 
+                onClick={() => {
+                  setIsMembersOpen(!isMembersOpen);
+                  setIsChatOpen(false);
+                }}
+                className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md transition-colors ${isMembersOpen ? 'bg-indigo-50 text-indigo-600' : 'hover:bg-slate-100 text-slate-500'}`}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                   <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
-                <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-tight">{activeUsers.length} Online</span>
-              </div>
+                <span className="text-[10px] font-extrabold uppercase tracking-tight">{activeUsers.length} Online</span>
+                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" className={isMembersOpen ? 'rotate-180' : ''}>
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
             </div>
           </div>
         </div>
@@ -303,8 +314,11 @@ function App() {
 
           {/* Chat Toggle Button */}
           <button 
-            onClick={() => setIsChatOpen(!isChatOpen)}
-            className="w-14 h-14 bg-white/80 backdrop-blur-xl rounded-2xl shadow-lg border border-white/50 flex items-center justify-center text-slate-700 hover:shadow-xl hover:bg-white/90 transition-all active:scale-95 relative"
+            onClick={() => {
+              setIsChatOpen(!isChatOpen);
+              setIsMembersOpen(false);
+            }}
+            className={`w-14 h-14 bg-white/80 backdrop-blur-xl rounded-2xl shadow-lg border border-white/50 flex items-center justify-center text-slate-700 hover:shadow-xl hover:bg-white/90 transition-all active:scale-95 relative ${isChatOpen ? 'ring-2 ring-indigo-500' : ''}`}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
             {unreadCount > 0 && !isChatOpen && (
@@ -451,6 +465,13 @@ function App() {
         isOpen={isChatOpen} 
         onClose={() => setIsChatOpen(false)} 
         isConnected={isConnected}
+      />
+
+      <MembersPanel
+        users={activeUsers}
+        isOpen={isMembersOpen}
+        onClose={() => setIsMembersOpen(false)}
+        currentUserId={socket?.id}
       />
 
     </div>
