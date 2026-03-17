@@ -12,9 +12,10 @@ type ChatPanelProps = {
   onSendMessage: (text: string) => void;
   isOpen: boolean;
   onClose: () => void;
+  isConnected: boolean;
 };
 
-export function ChatPanel({ messages, onSendMessage, isOpen, onClose }: ChatPanelProps) {
+export function ChatPanel({ messages, onSendMessage, isOpen, onClose, isConnected }: ChatPanelProps) {
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -50,7 +51,7 @@ export function ChatPanel({ messages, onSendMessage, isOpen, onClose }: ChatPane
 
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
           <div className="text-[9px] text-slate-300 font-mono text-center pb-2 border-b border-slate-50">
-            Messages: {messages.length} | Sync: Active
+            Messages: {messages.length} | Sync: {isConnected ? 'Active' : 'Wait...'}
           </div>
           
           {messages.length === 0 ? (

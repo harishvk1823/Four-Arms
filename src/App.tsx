@@ -76,6 +76,7 @@ function App() {
     });
 
     newSocket.on('init-sync', (data: { objects: any[], users: User[], messages: ChatMessage[] }) => {
+      console.log(`[Chat] Init-sync received. Messages count:`, data.messages?.length || 0);
       setActiveUsers(data.users || []);
       setMessages(data.messages || []);
     });
@@ -137,8 +138,13 @@ function App() {
       return;
     }
     console.log(`[Chat] Sending message: ${text}`);
+    // Safe ID generation fallback for non-secure contexts (IP access)
+    const msgId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
+      ? crypto.randomUUID() 
+      : Math.random().toString(36).substring(2, 15);
+
     const msg: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: msgId,
       senderName: userName,
       text,
       timestamp: Date.now()
@@ -444,6 +450,7 @@ function App() {
         onSendMessage={handleSendMessage} 
         isOpen={isChatOpen} 
         onClose={() => setIsChatOpen(false)} 
+        isConnected={isConnected}
       />
 
     </div>
