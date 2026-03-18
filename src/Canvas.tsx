@@ -21,6 +21,17 @@ type RemoteCursor = {
   lastUpdate: number;
 };
 
+const generateId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    try {
+      return crypto.randomUUID();
+    } catch (e) {
+      // Fallback if randomUUID fails for some reason
+    }
+  }
+  return Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+};
+
 export const Canvas = forwardRef(({ 
   userName, 
   currentTool = 'pen', 
@@ -359,7 +370,7 @@ export const Canvas = forwardRef(({
       const text = window.prompt('Enter text:');
       if (text) {
         const newObj: DrawingObject = {
-          id: crypto.randomUUID(),
+          id: generateId(),
           type: 'text',
           points: [pos],
           color: currentColor,
@@ -375,13 +386,14 @@ export const Canvas = forwardRef(({
     setRedoStack([]); // Clear redo stack on new action
     setIsDrawing(true);
     const newObj: DrawingObject = { 
-      id: crypto.randomUUID(), 
+      id: generateId(), 
       type: currentTool, 
       points: [pos], 
       color: currentTool === 'eraser' ? '#000000' : currentColor, 
       width: currentTool === 'eraser' ? 10 : strokeWidth
     };
     setCurrentObject(newObj);
+    socket?.emit('draw-object', newObj);
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
@@ -410,7 +422,9 @@ export const Canvas = forwardRef(({
       return;
     }
     if (!isDrawing || !currentObject) return;
-    setCurrentObject(prev => prev ? { ...prev, points: [...prev.points, pos] } : null);
+    const updated = { ...currentObject, points: [...currentObject.points, pos] };
+    setCurrentObject(updated);
+    socket?.emit('update-object', updated);
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
@@ -421,7 +435,8 @@ export const Canvas = forwardRef(({
     setIsDrawing(false);
     if (currentObject) {
       setObjects(prev => [...prev, currentObject]);
-      socket?.emit('draw-object', currentObject);
+      // Final update for the object to ensure everyone has the complete points
+      socket?.emit('update-object', currentObject);
       setCurrentObject(null);
     }
   };
@@ -537,6 +552,14 @@ export const Canvas = forwardRef(({
           </div>
         </div>
       ))}
+
+      {/* Connection Status Indicator (Subtle) */}
+      <div className="absolute bottom-6 right-6 flex items-center gap-2 px-3 py-1.5 bg-white/50 backdrop-blur-md rounded-full border border-white/20 shadow-sm pointer-events-none select-none z-10 transition-all opacity-60 hover:opacity-100">
+        <div className={`w-2 h-2 rounded-full ${socket?.connected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">
+          {socket?.connected ? 'Live Sync' : 'Offline'}
+        </span>
+      </div>
     </div>
   );
 });

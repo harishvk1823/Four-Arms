@@ -21,7 +21,7 @@ const rooms = {};
 function getRoom(roomId) {
   const normalizedId = (roomId || '').trim().toLowerCase();
   if (!rooms[normalizedId]) {
-    rooms[normalizedId] = { objects: [], users: {}, messages: [] };
+    rooms[normalizedId] = { objects: [], users: {}, messages: [], meetLink: null };
   }
   return rooms[normalizedId];
 }
@@ -48,7 +48,8 @@ io.on('connection', (socket) => {
     socket.emit('init-sync', {
       objects: roomState.objects,
       users: Object.values(roomState.users),
-      messages: roomState.messages
+      messages: roomState.messages,
+      meetLink: roomState.meetLink
     });
 
     // Notify all users in the room of the updated user list
@@ -118,6 +119,15 @@ io.on('connection', (socket) => {
     if (roomState.messages.length > 100) roomState.messages.shift();
     io.to(currentRoom).emit('new-message', msg);
     console.log(`[Chat] Message broadcast to room "${currentRoom}" from "${msg.senderName}" (${socket.id})`);
+  });
+  
+  // Google Meet link update
+  socket.on('update-meet-link', (link) => {
+    if (!currentRoom) return;
+    const roomState = getRoom(currentRoom);
+    roomState.meetLink = link;
+    io.to(currentRoom).emit('meet-link-updated', link);
+    console.log(`[Meet] Link updated for room "${currentRoom}": ${link}`);
   });
 
   socket.on('disconnect', () => {

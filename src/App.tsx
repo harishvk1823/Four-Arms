@@ -41,15 +41,16 @@ function App() {
   const [currentColor, setCurrentColor] = useState<string>(COLORS[0].value);
   const [strokeWidth, setStrokeWidth] = useState(3);
   const [clearTriggered, setClearTriggered] = useState(0);
-  const [isMeetMenuOpen, setIsMeetMenuOpen] = useState(false);
 
   // Phase 5: Messaging & Presence
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [activeUsers, setActiveUsers] = useState<User[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [meetLink, setMeetLink] = useState<string | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isMembersOpen, setIsMembersOpen] = useState(false);
+  const [isMeetSidebarOpen, setIsMeetSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [objects, setObjects] = useState<DrawingObject[]>([]);
 
@@ -91,11 +92,12 @@ function App() {
       setIsConnected(false);
     });
 
-    newSocket.on('init-sync', (data: { objects: DrawingObject[], users: User[], messages: ChatMessage[] }) => {
+    newSocket.on('init-sync', (data: { objects: DrawingObject[], users: User[], messages: ChatMessage[], meetLink: string | null }) => {
       console.log(`[Chat] Init-sync received. Messages count:`, data.messages?.length || 0);
+      setObjects(data.objects || []);
       setActiveUsers(data.users || []);
       setMessages(data.messages || []);
-      setObjects(data.objects || []);
+      setMeetLink(data.meetLink || null);
     });
 
     newSocket.on('users-updated', (users: User[]) => {
@@ -114,6 +116,10 @@ function App() {
         }
         return current;
       });
+    });
+
+    newSocket.on('meet-link-updated', (link: string | null) => {
+      setMeetLink(link);
     });
 
     return () => {
@@ -158,8 +164,20 @@ function App() {
         }
         setTimeout(() => setShowCopiedToast(false), 2000);
       }
-    } catch (err) {
+    } catch (err) {  
       console.error('Sharing failed:', err);
+    }
+  };
+
+  const handleUpdateMeetLink = () => {
+    const link = window.prompt('Paste your Google Meet or Video Call link here:', meetLink || '');
+    if (link !== null) {
+      const trimmedLink = link.trim();
+      if (trimmedLink) {
+        socket?.emit('update-meet-link', trimmedLink);
+      } else {
+        socket?.emit('update-meet-link', null);
+      }
     }
   };
 
@@ -193,8 +211,8 @@ function App() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-dot-pattern bg-[length:24px_24px] bg-slate-50 transition-colors duration-500 animate-in fade-in duration-700">
-      <header className="fixed top-0 left-0 w-full h-16 flex items-center justify-between px-6 bg-white/70 backdrop-blur-xl border-b border-slate-200/50 z-30 select-none">
-        <div className="flex items-center gap-6">
+      <header className="fixed top-0 left-0 w-full h-16 flex items-center justify-between px-6 bg-white/70 backdrop-blur-xl border-b border-slate-200/50 z-30 select-none pointer-events-none">
+        <div className="flex items-center gap-6 pointer-events-auto">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
               <span className="text-white font-black text-xl italic tracking-tighter">4A</span>
@@ -209,7 +227,30 @@ function App() {
 
           {/* Collaborative Link Display */}
           <div className="hidden lg:flex flex-col gap-1">
-            <CollaborationLink roomId={roomPassword} onCopy={handleShare} />
+            <div className="flex items-center gap-2">
+              <CollaborationLink roomId={roomPassword} onCopy={handleShare} />
+              {meetLink && (
+                <div className="flex items-center gap-1">
+                  <a 
+                    href={meetLink} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-rose-500 text-white rounded-xl shadow-lg shadow-rose-200 hover:bg-rose-600 hover:-translate-y-0.5 transition-all text-[11px] font-black uppercase tracking-tight active:scale-95 group"
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                    Join Video
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="group-hover:translate-x-0.5 transition-transform"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>
+                  </a>
+                  <button 
+                    onClick={() => setIsMeetSidebarOpen(!isMeetSidebarOpen)}
+                    className={`p-1.5 rounded-lg transition-all ${isMeetSidebarOpen ? 'bg-rose-100 text-rose-600' : 'text-slate-400 hover:bg-slate-100'}`}
+                    title={isMeetSidebarOpen ? 'Close Meet Sidebar' : 'Open Meet Sidebar'}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/></svg>
+                  </button>
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-5 ml-1">
               <div className="flex items-center gap-1.5 font-bold uppercase tracking-tight">
                 <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
@@ -237,7 +278,7 @@ function App() {
         </div>
 
         {/* Top Right Actions */}
-        <div className="pointer-events-auto flex items-start gap-4">
+        <div className="flex items-center gap-4 pointer-events-auto">
           <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-lg border border-white/50 p-2 flex gap-2 transition-all hover:shadow-xl hover:bg-white/90">
             
             {/* Share Link Button */}
@@ -257,66 +298,19 @@ function App() {
                 </>
               )}
             </button>
+            
             <div className="w-[1px] h-auto bg-slate-200 my-1 mx-1" />
 
-            {/* Google Meet Dropdown Container */}
-            <div className="relative">
-              <button 
-                onClick={() => setIsMeetMenuOpen(!isMeetMenuOpen)}
-                className="px-4 py-2 text-sm font-semibold text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl transition-all duration-200 active:scale-95 flex items-center gap-2"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
-                Google Meet
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform duration-300 ${isMeetMenuOpen ? 'rotate-180' : ''}`}><polyline points="6 9 12 15 18 9"></polyline></svg>
-              </button>
+            {/* Google Meet Share Action */}
+            <button 
+              onClick={handleUpdateMeetLink}
+              className="px-4 py-2 text-sm font-bold text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl transition-all duration-200 active:scale-95 flex items-center gap-2 uppercase tracking-tight"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+              {meetLink ? 'Sync Video' : 'Link Video'}
+            </button>
 
-              {/* Dropdown Menu Panel */}
-              <div 
-                className={`
-                  absolute right-0 top-full mt-3 w-56 bg-white/90 backdrop-blur-2xl border border-white/60 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)] overflow-hidden origin-top-right transition-all duration-300 z-50
-                  ${isMeetMenuOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}
-                `}
-              >
-                <div className="p-1.5 flex flex-col gap-1">
-                  <a 
-                    href="https://meet.google.com/new" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    onClick={() => setIsMeetMenuOpen(false)}
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-700 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors"
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-emerald-100/50 flex items-center justify-center text-emerald-600">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
-                    </div>
-                    Start Instant Meet
-                  </a>
-                  <a 
-                    href="https://calendar.google.com/calendar/u/0/r/eventedit?vcon=meet&title=FOUR+ARMS+Collaboration" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    onClick={() => setIsMeetMenuOpen(false)}
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-indigo-100/50 flex items-center justify-center text-indigo-600">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                    </div>
-                    Schedule in Calendar
-                  </a>
-                  <a 
-                    href="https://meet.google.com/" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    onClick={() => setIsMeetMenuOpen(false)}
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
-                  >
-                   <div className="w-8 h-8 rounded-lg bg-blue-100/50 flex items-center justify-center text-blue-600">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
-                    </div>
-                    Join with a code
-                  </a>
-                </div>
-              </div>
-            </div>
+            <div className="w-[1px] h-auto bg-slate-200 my-1 mx-1" />
 
             <button 
               onClick={() => canvasRef.current?.exportImage()}
@@ -516,6 +510,59 @@ function App() {
         currentUserId={socket?.id}
       />
 
+      {/* Google Meet Sidebar */}
+      {meetLink && (
+        <div 
+          className={`fixed top-16 right-0 h-[calc(100vh-64px)] bg-white border-l border-slate-200 shadow-2xl transition-all duration-500 z-40 flex flex-col overflow-hidden ${isMeetSidebarOpen ? 'w-[400px] opacity-100' : 'w-0 opacity-0 pointer-events-none'}`}
+        >
+          <div className="flex items-center justify-between p-4 bg-slate-50 border-b border-slate-200">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-rose-100 rounded-lg flex items-center justify-center text-rose-600">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+              </div>
+              <span className="font-bold text-slate-800 text-sm tracking-tight uppercase">Live Meeting</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => window.open(meetLink, '_blank')}
+                className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                title="Open in new tab"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>
+              </button>
+              <button 
+                onClick={() => setIsMeetSidebarOpen(false)}
+                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 bg-slate-100 relative group">
+            <iframe 
+              src={meetLink} 
+              className="w-full h-full border-none" 
+              allow="camera; microphone; fullscreen; display-capture; autoplay"
+              title="Google Meet"
+            />
+            {/* Overlay for when iframe blocks interactions or has issues */}
+            <div className="absolute inset-0 bg-slate-900/10 backdrop-blur-[1px] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none flex items-center justify-center p-8">
+              <div className="bg-white p-6 rounded-2xl shadow-xl border border-slate-200 text-center flex flex-col items-center gap-4 pointer-events-auto">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Meeting Active</p>
+                <p className="text-sm text-slate-700 leading-relaxed font-medium">If the meeting doesn't load here, it might be blocked by the provider.</p>
+                <a 
+                  href={meetLink} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-tight shadow-lg shadow-indigo-100 hover:-translate-y-0.5 transition-all"
+                >
+                  Open in New Tab
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
