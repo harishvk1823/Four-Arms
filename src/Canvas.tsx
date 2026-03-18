@@ -56,7 +56,6 @@ export const Canvas = forwardRef(({
   const cursorRef = useRef<HTMLDivElement>(null);
   
   // App state
-  const [isDrawing, setIsDrawing] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [isDraggingObj, setIsDraggingObj] = useState(false);
   
@@ -70,6 +69,18 @@ export const Canvas = forwardRef(({
   const [offset, setOffset] = useState<Point>({ x: 0, y: 0 });
   const [lastPanPoint, setLastPanPoint] = useState<Point | null>(null);
   const [lastDragPoint, setLastDragPoint] = useState<Point | null>(null);
+
+  // Refs for high-frequency updates to avoid stale state and excessive re-renders
+  const drawingStateRef = useRef({
+    isDrawing: false,
+    isPanning: false,
+    isDraggingObj: false,
+    currentObject: null as DrawingObject | null,
+    lastPanPoint: null as Point | null,
+    lastDragPoint: null as Point | null,
+    lastEmitTime: 0,
+    lastCursorEmitTime: 0
+  });
 
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
@@ -384,7 +395,7 @@ export const Canvas = forwardRef(({
     }
     setSelectedObjectId(null);
     setRedoStack([]); // Clear redo stack on new action
-    setIsDrawing(true);
+    
     const newObj: DrawingObject = { 
       id: generateId(), 
       type: currentTool, 
@@ -392,12 +403,17 @@ export const Canvas = forwardRef(({
       color: currentTool === 'eraser' ? '#000000' : currentColor, 
       width: currentTool === 'eraser' ? 10 : strokeWidth
     };
+    
+    drawingStateRef.current.isDrawing = true;
+    drawingStateRef.current.currentObject = newObj;
     setCurrentObject(newObj);
     socket?.emit('draw-object', newObj);
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
     updateCursorPosition(e);
+    const state = drawingStateRef.current;
+
     if (isPanning && lastPanPoint) {
       const dx = e.clientX - lastPanPoint.x;
       const dy = e.clientY - lastPanPoint.y;
@@ -405,38 +421,82 @@ export const Canvas = forwardRef(({
       setLastPanPoint({ x: e.clientX, y: e.clientY });
       return;
     }
+    
     const pos = getPointerPos(e);
-    // Broadcast cursor
-    socket?.emit('cursor-move', { name: userName, x: e.clientX, y: e.clientY });
+    
+    // Throttled cursor broadcast (approx 30fps)
+    const now = Date.now();
+    if (now - state.lastCursorEmitTime > 32) {
+      socket?.emit('cursor-move', { name: userName, x: e.clientX, y: e.clientY });
+      state.lastCursorEmitTime = now;
+    }
 
     if (currentTool === 'select' && isDraggingObj && selectedObjectId && lastDragPoint) {
       const dx = pos.x - lastDragPoint.x;
       const dy = pos.y - lastDragPoint.y;
+      
       setObjects(prev => prev.map(obj => {
         if (obj.id !== selectedObjectId) return obj;
         const updated = { ...obj, points: obj.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
-        socket?.emit('update-object', updated);
+        
+        // Throttled object update (approx 20fps)
+        if (now - state.lastEmitTime > 50) {
+          socket?.emit('update-object', updated);
+          state.lastEmitTime = now;
+        }
         return updated;
       }));
       setLastDragPoint(pos);
       return;
     }
-    if (!isDrawing || !currentObject) return;
-    const updated = { ...currentObject, points: [...currentObject.points, pos] };
+
+    if (!state.isDrawing || !state.currentObject) return;
+    
+    const updated = { 
+      ...state.currentObject, 
+      points: [...state.currentObject.points, pos] 
+    };
+    
+    state.currentObject = updated;
     setCurrentObject(updated);
-    socket?.emit('update-object', updated);
+
+    // Throttled drawing update (approx 20fps)
+    if (now - state.lastEmitTime > 50) {
+      socket?.emit('update-object', updated);
+      state.lastEmitTime = now;
+    }
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
+    const state = drawingStateRef.current;
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-    if (isPanning) { setIsPanning(false); setLastPanPoint(null); return; }
-    if (isDraggingObj) { setIsDraggingObj(false); setLastDragPoint(null); return; }
-    if (!isDrawing) return;
-    setIsDrawing(false);
-    if (currentObject) {
-      setObjects(prev => [...prev, currentObject]);
+    
+    if (isPanning) { 
+      setIsPanning(false); 
+      setLastPanPoint(null); 
+      return; 
+    }
+    
+    if (isDraggingObj) { 
+      setIsDraggingObj(false); 
+      setLastDragPoint(null); 
+      if (selectedObjectId) {
+        const obj = objects.find(o => o.id === selectedObjectId);
+        if (obj) socket?.emit('update-object', obj);
+      }
+      return; 
+    }
+    
+    if (!state.isDrawing) return;
+    
+    const finalObj = state.currentObject;
+    state.isDrawing = false;
+    state.currentObject = null;
+    
+    if (finalObj) {
+      setObjects(prev => [...prev, finalObj]);
       // Final update for the object to ensure everyone has the complete points
-      socket?.emit('update-object', currentObject);
+      socket?.emit('update-object', finalObj);
       setCurrentObject(null);
     }
   };
