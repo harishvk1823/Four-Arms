@@ -143,7 +143,36 @@ function App() {
     setIsAuthenticated(true);
   };
 
-  const handleShare = async () => {
+  const copyToClipboard = async (text: string) => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (err) {
+        console.error('Clipboard API failed', err);
+      }
+    }
+    
+    // Legacy fallback
+    try {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-9999px";
+      textArea.style.top = "0";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      return successful;
+    } catch (err) {
+      console.error('Fallback copy failed', err);
+      return false;
+    }
+  };
+
+  const handleShare = async (forceCopy: boolean = false) => {
     try {
       const url = new URL(window.location.origin + window.location.pathname);
       url.searchParams.set('room', roomPassword.trim().toLowerCase());
@@ -154,18 +183,45 @@ function App() {
         url: shareUrl,
       };
 
+      // Always try to copy to clipboard first if possible/requested
+      if (forceCopy || !navigator.share) {
+        const success = await copyToClipboard(shareUrl);
+        if (success) {
+          setShowCopiedToast(true);
+          setTimeout(() => setShowCopiedToast(false), 2000);
+        } else {
+          alert('Failed to copy link. Please copy it manually from the browser address bar.');
+        }
+        
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          console.log('Sharing a localhost link.');
+        }
+        return;
+      }
+
       if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
         await navigator.share(shareData);
       } else {
-        await navigator.clipboard.writeText(shareUrl);
-        setShowCopiedToast(true);
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-          alert('Note: You are sharing a "localhost" link. Others can only join if they are on your same network and use your IP address.');
+        const success = await copyToClipboard(shareUrl);
+        if (success) {
+          setShowCopiedToast(true);
+          setTimeout(() => setShowCopiedToast(false), 2000);
         }
-        setTimeout(() => setShowCopiedToast(false), 2000);
       }
     } catch (err) {  
       console.error('Sharing failed:', err);
+      // Fallback to clipboard on any error
+      try {
+        const url = new URL(window.location.origin + window.location.pathname);
+        url.searchParams.set('room', roomPassword.trim().toLowerCase());
+        const success = await copyToClipboard(url.toString());
+        if (success) {
+          setShowCopiedToast(true);
+          setTimeout(() => setShowCopiedToast(false), 2000);
+        }
+      } catch (e) {
+        console.error('Final fallback failed:', e);
+      }
     }
   };
 
@@ -228,7 +284,7 @@ function App() {
           {/* Collaborative Link Display */}
           <div className="hidden lg:flex flex-col gap-1">
             <div className="flex items-center gap-2">
-              <CollaborationLink roomId={roomPassword} onCopy={handleShare} />
+              <CollaborationLink roomId={roomPassword} onCopy={() => handleShare(true)} />
               {meetLink && (
                 <div className="flex items-center gap-1">
                   <a 
@@ -283,7 +339,7 @@ function App() {
             
             {/* Share Link Button */}
             <button 
-              onClick={handleShare}
+              onClick={() => handleShare()}
               className={`px-4 py-2 text-sm font-semibold rounded-xl transition-all duration-200 active:scale-95 flex items-center gap-2 ${showCopiedToast ? 'bg-indigo-100 text-indigo-700' : 'text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700'}`}
             >
               {showCopiedToast ? (
@@ -506,7 +562,7 @@ function App() {
         roomId={roomPassword}
         isOpen={isMembersOpen}
         onClose={() => setIsMembersOpen(false)}
-        onInvite={handleShare}
+        onInvite={() => handleShare(true)}
         currentUserId={socket?.id}
       />
 
