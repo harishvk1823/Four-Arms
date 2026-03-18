@@ -19,10 +19,11 @@ const io = new Server(httpServer, {
 const rooms = {};
 
 function getRoom(roomId) {
-  if (!rooms[roomId]) {
-    rooms[roomId] = { objects: [], users: {}, messages: [] };
+  const normalizedId = (roomId || '').trim().toLowerCase();
+  if (!rooms[normalizedId]) {
+    rooms[normalizedId] = { objects: [], users: {}, messages: [] };
   }
-  return rooms[roomId];
+  return rooms[normalizedId];
 }
 
 io.on('connection', (socket) => {
@@ -32,8 +33,8 @@ io.on('connection', (socket) => {
   let currentRoom = null;
 
   socket.on('join-room', ({ name, room }) => {
-    // Default room if no password provided
-    const roomId = room || '__default__';
+    // Default room if no password provided (normalize for consistency)
+    const roomId = (room || '__default__').trim().toLowerCase();
     currentRoom = roomId;
 
     // Join Socket.IO room for targeted broadcasting
@@ -51,8 +52,9 @@ io.on('connection', (socket) => {
     });
 
     // Notify all users in the room of the updated user list
-    io.to(roomId).emit('users-updated', Object.values(roomState.users));
-    console.log(`User "${name}" joined room "${roomId}"`);
+    const roomUsers = Object.values(roomState.users);
+    io.to(roomId).emit('users-updated', roomUsers);
+    console.log(`[Join] User "${name}" (${socket.id}) joined room "${roomId}". Total users in room: ${roomUsers.length}`);
   });
 
   // New drawing object
@@ -61,6 +63,7 @@ io.on('connection', (socket) => {
     const roomState = getRoom(currentRoom);
     roomState.objects.push(obj);
     socket.to(currentRoom).emit('new-object', obj);
+    console.log(`[Draw] New object ${obj.id} (type: ${obj.type}) from ${socket.id} in room "${currentRoom}"`);
   });
 
   // Cursor movement
@@ -114,6 +117,7 @@ io.on('connection', (socket) => {
     roomState.messages.push(msg);
     if (roomState.messages.length > 100) roomState.messages.shift();
     io.to(currentRoom).emit('new-message', msg);
+    console.log(`[Chat] Message broadcast to room "${currentRoom}" from "${msg.senderName}" (${socket.id})`);
   });
 
   socket.on('disconnect', () => {
@@ -136,6 +140,7 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3001;
-httpServer.listen(PORT, () => {
-  console.log(`Whiteboard sync server running on port ${PORT}`);
+const HOST = '0.0.0.0';
+httpServer.listen(PORT, HOST, () => {
+  console.log(`Whiteboard sync server running on ${HOST}:${PORT}`);
 });

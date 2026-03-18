@@ -77,7 +77,8 @@ function App() {
 
     newSocket.on('connect', () => {
       setIsConnected(true);
-      newSocket.emit('join-room', { name: userName, room: roomPassword });
+      const normalizedRoom = (roomPassword || '').trim().toLowerCase();
+      newSocket.emit('join-room', { name: userName, room: normalizedRoom });
     });
 
     newSocket.on('disconnect', () => {
@@ -130,20 +131,34 @@ function App() {
     // For now, if they provide any password, let them in.
     setUserName(name);
     if (password) {
-      setRoomPassword(password);
+      setRoomPassword(password.trim().toLowerCase());
     }
     setIsAuthenticated(true);
   };
 
   const handleShare = async () => {
     try {
-      const url = new URL(window.location.href);
-      url.searchParams.set('room', roomPassword);
-      await navigator.clipboard.writeText(url.toString());
-      setShowCopiedToast(true);
-      setTimeout(() => setShowCopiedToast(false), 2000);
+      const url = new URL(window.location.origin + window.location.pathname);
+      url.searchParams.set('room', roomPassword.trim().toLowerCase());
+      const shareUrl = url.toString();
+      const shareData = {
+        title: 'Join my Four Arms Canvas',
+        text: `Join my collaborative drawing session on Four Arms! Room: ${roomPassword}`,
+        url: shareUrl,
+      };
+
+      if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        setShowCopiedToast(true);
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          alert('Note: You are sharing a "localhost" link. Others can only join if they are on your same network and use your IP address.');
+        }
+        setTimeout(() => setShowCopiedToast(false), 2000);
+      }
     } catch (err) {
-      console.error('Failed to copy link:', err);
+      console.error('Sharing failed:', err);
     }
   };
 

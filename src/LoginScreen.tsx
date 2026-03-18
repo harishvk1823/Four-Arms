@@ -13,7 +13,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
     const params = new URLSearchParams(window.location.search);
     const roomParam = params.get('room');
     if (roomParam) {
-      setPassword(roomParam);
+      setPassword(roomParam.trim().toLowerCase());
       setIsLogin(true); // Default to login if they are joining an existing room
     }
   }, []);
@@ -21,7 +21,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && password.trim()) {
-      onLogin(name.trim(), password.trim());
+      onLogin(name.trim(), password.trim().toLowerCase());
     }
   };
 

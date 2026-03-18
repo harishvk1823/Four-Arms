@@ -27,7 +27,7 @@ export function ActiveUsers({ users }: ActiveUsersProps) {
   };
 
   return (
-    <div className="absolute top-6 left-1/2 -translate-x-1/2 pointer-events-auto z-20 flex bg-white/70 backdrop-blur-xl border border-white/40 shadow-sm p-1.5 rounded-full items-center pl-3 gap-3">
+    <div className="absolute top-6 left-1/2 -translate-x-1/2 pointer-events-auto z-40 flex bg-white/70 backdrop-blur-xl border border-white/40 shadow-sm p-1.5 rounded-full items-center pl-3 gap-3">
       <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
         {users.length} {users.length === 1 ? 'User' : 'Users'}
       </span>
