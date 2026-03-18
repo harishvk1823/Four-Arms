@@ -5,6 +5,7 @@ import { LoginScreen } from './LoginScreen';
 import { ActiveUsers, User } from './components/ActiveUsers';
 import { ChatPanel, ChatMessage } from './components/ChatPanel';
 import { MembersPanel } from './components/MembersPanel';
+import { CollaborationLink } from './components/CollaborationLink';
 
 type ToolType = 'select' | 'pen' | 'pencil' | 'marker' | 'painter' | 'rectangle' | 'circle' | 'eraser' | 'text';
 
@@ -206,19 +207,14 @@ function App() {
 
           <div className="h-8 w-[1px] bg-slate-200 hidden md:block" />
 
-          {/* Room Info */}
-          <div className="hidden lg:flex flex-col">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Room ID</span>
-              <div className="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-mono font-bold text-slate-600 border border-slate-200">
-                {roomPassword}
-              </div>
-            </div>
-            <div className="flex items-center gap-5 mt-1">
-              <div className="flex items-center gap-1.5">
+          {/* Collaborative Link Display */}
+          <div className="hidden lg:flex flex-col gap-1">
+            <CollaborationLink roomId={roomPassword} onCopy={handleShare} />
+            <div className="flex items-center gap-5 ml-1">
+              <div className="flex items-center gap-1.5 font-bold uppercase tracking-tight">
                 <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-                <span className={`text-[10px] font-bold uppercase tracking-tight ${isConnected ? 'text-emerald-600' : 'text-rose-600'}`}>
-                  {isConnected ? 'Live Sync Active' : 'Connecting' /* Shortened for space */}
+                <span className={`text-[9px] ${isConnected ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {isConnected ? 'Sync Active' : 'Connecting'}
                 </span>
               </div>
               <button 
@@ -226,13 +222,13 @@ function App() {
                   setIsMembersOpen(!isMembersOpen);
                   setIsChatOpen(false);
                 }}
-                className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md transition-colors ${isMembersOpen ? 'bg-indigo-50 text-indigo-600' : 'hover:bg-slate-100 text-slate-500'}`}
+                className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md transition-all active:scale-95 ${isMembersOpen ? 'bg-indigo-50 text-indigo-600' : 'hover:bg-slate-100 text-slate-500'}`}
               >
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                   <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
-                <span className="text-[10px] font-extrabold uppercase tracking-tight">{activeUsers.length} Online</span>
-                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" className={isMembersOpen ? 'rotate-180' : ''}>
+                <span className="text-[9px] font-extrabold uppercase tracking-tight">{activeUsers.length} Online</span>
+                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" className={`transition-transform duration-300 ${isMembersOpen ? 'rotate-180' : ''}`}>
                   <polyline points="6 9 12 15 18 9"></polyline>
                 </svg>
               </button>
